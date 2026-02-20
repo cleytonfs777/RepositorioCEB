@@ -16,18 +16,17 @@ O script:
 ⚠️ Importante:
 - Você precisa informar/fornecer a tabela de "valor-dia" por graduação (o que a planilha pega por VLOOKUP na aba DADOS).
   Você pode preencher o dicionário VALOR_DIA_POR_GRADUACAO com seus valores reais.
-- Municípios especiais são lidos do DOCX "Relação dos Municípios Especiais" (python-docx).
+- Municípios especiais: lista embutida no código (conforme relação fornecida).
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Set, Tuple
-
-from docx import Document
 
 
 # ----------------------------
@@ -51,13 +50,88 @@ CAPITAIS_BR = {
 }
 
 # ----------------------------
+# Municípios especiais (normalizados)
+# ----------------------------
+MUNICIPIOS_ESPECIAIS_MG = {
+    "alfenas",
+    "araguari",
+    "araxa",
+    "barbacena",
+    "betim",
+    "brumadinho",
+    "camanducaia",
+    "capitolio",
+    "cataguases",
+    "caxambu",
+    "conceicao do mato dentro",
+    "congonhas",
+    "conselheiro lafaiete",
+    "contagem",
+    "diamantina",
+    "divinopolis",
+    "frutal",
+    "governador valadares",
+    "ipatinga",
+    "itabira",
+    "itabirito",
+    "itajuba",
+    "ituiutaba",
+    "janauba",
+    "joao pinheiro",
+    "juiz de fora",
+    "lavras",
+    "manhuacu",
+    "mariana",
+    "montes claros",
+    "nova lima",
+    "ouro preto",
+    "paracatu",
+    "passos",
+    "patos de minas",
+    "patrocinio",
+    "pocos de caldas",
+    "pouso alegre",
+    "santana do riacho",
+    "sao joao del rei",
+    "sao lourenco",
+    "sete lagoas",
+    "teofilo otoni",
+    "tiradentes",
+    "uberaba",
+    "uberlandia",
+    "unai",
+    "varginha",
+    "vicosa",
+}
+
+# ----------------------------
 # TABELA: valor-dia por graduação/posto (você deve preencher!)
 # Na planilha isso vem de: VLOOKUP(GRAD, DADOS!D2:F22, 3)
 # ----------------------------
 VALOR_DIA_POR_GRADUACAO: Dict[str, float] = {
-    # EXEMPLO (substitua pelos seus valores reais):
-    # "CAP": 15276.62 / 30,
-    # "TEN": 12000.00 / 30,
+    # Chave normalizada (ver norm_grad_key): só letras/números em maiúsculo.
+    # Valores copiados da aba DADOS (coluna "Capital" = Remuneração/30).
+    "CEL": 684.24,
+    "TENCEL": 617.19,
+    "MAJ": 550.12,
+    "CAP": 509.22,
+    "1TEN": 453.03,
+    "2TEN": 384.90,
+    "ASP": 345.75,
+    "CADUA": 308.14,
+    "ALSUBTEN": 345.75,
+    "AL1SGT": 308.14,
+    "AL2SGT": 268.99,
+    "CADDA": 250.23,
+    "SUBTEN": 345.75,
+    "1SGT": 308.14,
+    "2SGT": 268.99,
+    "3SGT": 237.36,
+    "CB": 205.72,
+    "SD1CL": 177.75,
+    "SD2CL": 152.08,
+    "CMTGERAL": 1605.94,
+    "CHEM": 1684.83,
 }
 
 
@@ -68,23 +142,24 @@ def norm(s: str) -> str:
     return " ".join(s.strip().lower().split())
 
 
+def norm_grad_key(graduacao: str) -> str:
+        """Normaliza a graduação/posto para chave do dicionário.
+
+        Exemplos:
+            - "1ºTen" -> "1TEN"
+            - "Ten-Cel" -> "TENCEL"
+            - "Sd1ªCl." -> "SD1CL"
+            - "Al. 1º Sgt" -> "AL1SGT"
+        """
+        s = graduacao.strip().upper()
+        s = s.replace("º", "").replace("ª", "")
+        s = re.sub(r"[^A-Z0-9]", "", s)
+        return s
+
+
 def parse_dt(s: str) -> datetime:
     """Formato esperado: YYYY-MM-DD HH:MM"""
     return datetime.strptime(s, "%Y-%m-%d %H:%M")
-
-
-def carregar_municipios_especiais(docx_path: Path) -> Set[str]:
-    """Lê o DOCX anexado pelo usuário e retorna set normalizado."""
-    doc = Document(str(docx_path))
-    especiais: Set[str] = set()
-    for p in doc.paragraphs:
-        t = p.text.strip()
-        if not t:
-            continue
-        if t.replace(".", "").isdigit():  # ignora 1., 2., etc
-            continue
-        especiais.add(norm(t))
-    return especiais
 
 
 def classificar_destino(municipio: str, outro_estado: bool, especiais_mg: Set[str]) -> str:
@@ -114,11 +189,9 @@ def classificar_destino(municipio: str, outro_estado: bool, especiais_mg: Set[st
 # ----------------------------
 def calcular_di_pa_planilha(inicio: datetime, fim: datetime) -> Tuple[int, int]:
     """
-    Replica:
-      B7 = INT(fim - inicio)                     -> dias completos (DI base)
-      C7 = ROUND(MOD(fim-inicio,1)*24,2)         -> horas do resto
-      Ajuste: se hora_fim < hora_inicio => DI = B7 + 1
-      PA: se hora_fim >= hora_inicio e resto_horas >= 6 => 1, senão 0
+    Réplica exata da planilha:
+      DI = INT(fim - inicio) + (1 se hora_fim < hora_inicio)
+      PA = 1 se (hora_fim >= hora_inicio) e (resto_horas >= 6), senão 0
     """
     if fim <= inicio:
         raise ValueError("fim deve ser maior que inicio")
@@ -146,13 +219,13 @@ def distribuir_quantidades(di: int, pa: int, tem_pousada: bool) -> Tuple[int, in
         M = PA (0 ou 1)
         N = DI   (PP acompanha cada DI)
     - Se não tem pousada:
-        L = 0
+        L = DI
+        M = PA (0 ou 1)
         N = 0
-        M = DI + PA  (tudo vira PA)
     """
     if tem_pousada:
         return di, pa, di
-    return 0, di + pa, 0
+    return di, pa, 0
 
 
 # ----------------------------
@@ -184,11 +257,11 @@ def calc_h(tipo_trintenario: str, g: float) -> float:
 # Valor unitário K e Total - réplica da planilha
 # ----------------------------
 def calcular_k(graduacao: str, localidade: str, h: float, valor_dia_por_grad: Dict[str, float]) -> float:
-    grad = graduacao.strip().upper()
+    grad = norm_grad_key(graduacao)
     if grad not in valor_dia_por_grad:
         raise KeyError(
             f"Graduação '{grad}' não encontrada na tabela VALOR_DIA_POR_GRADUACAO. "
-            f"Preencha o dicionário no código com os valores reais (valor-dia)."
+            f"Verifique se digitou uma variação válida (ex.: 1ºTen, Ten-Cel, Sd1ªCl.)."
         )
     valor_dia = float(valor_dia_por_grad[grad])
     j = round(h * valor_dia, 2)
@@ -221,6 +294,67 @@ class Resultado:
     total: float
 
 
+def calcular_diarias(
+    *,
+    graduacao: str,
+    municipio: str,
+    inicio: datetime | str,
+    fim: datetime | str,
+    quinquenios: int = 0,
+    ade: float | None = None,
+    trintenario: str = "Não",
+    outro_estado: bool = False,
+    pousada: bool = False,
+    ajuda_custo: float = 74.98,
+    valor_dia_por_graduacao: Dict[str, float] | None = None,
+    municipios_especiais_mg: Set[str] | None = None,
+) -> Resultado:
+    """Calcula diárias replicando a planilha.
+
+    Parâmetros equivalentes aos do CLI.
+    - `inicio` e `fim` podem ser `datetime` ou string no formato `YYYY-MM-DD HH:MM`.
+    - `valor_dia_por_graduacao` e `municipios_especiais_mg` permitem sobrescrever tabelas.
+    """
+
+    if valor_dia_por_graduacao is None:
+        valor_dia_por_graduacao = VALOR_DIA_POR_GRADUACAO
+    if municipios_especiais_mg is None:
+        municipios_especiais_mg = MUNICIPIOS_ESPECIAIS_MG
+
+    if isinstance(inicio, str):
+        inicio_dt = parse_dt(inicio)
+    else:
+        inicio_dt = inicio
+    if isinstance(fim, str):
+        fim_dt = parse_dt(fim)
+    else:
+        fim_dt = fim
+
+    localidade = classificar_destino(municipio, bool(outro_estado), municipios_especiais_mg)
+
+    di, pa = calcular_di_pa_planilha(inicio_dt, fim_dt)
+    l_diarias, m_pas, n_pp = distribuir_quantidades(di, pa, bool(pousada))
+
+    g = calc_g(int(quinquenios), ade)
+    h = calc_h(trintenario, g)
+
+    k = calcular_k(graduacao, localidade, h, valor_dia_por_graduacao)
+    total = calcular_total(k, l_diarias, m_pas, n_pp, float(ajuda_custo))
+
+    return Resultado(
+        localidade=localidade,
+        di=di,
+        pa=pa,
+        L_diarias=l_diarias,
+        M_pas=m_pas,
+        N_pp=n_pp,
+        g=g,
+        h=h,
+        k=k,
+        total=total,
+    )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Cálculo de diárias (réplica da planilha) - CBMMG")
     ap.add_argument("--graduacao", required=True, help="Ex: CAP, TEN, SGT, CB...")
@@ -238,29 +372,20 @@ def main() -> None:
     ap.add_argument("--fim", required=True, help='YYYY-MM-DD HH:MM')
     ap.add_argument("--pousada", action="store_true", help="Marque se há pousada/pernoite (B5='Sim')")
     ap.add_argument("--ajuda-custo", type=float, default=74.98, help="Ajuda de custo (planilha ~74,98)")
-    ap.add_argument("--docx-municipios-especiais", required=True, help="Caminho do DOCX de municípios especiais")
 
     args = ap.parse_args()
 
-    especiais = carregar_municipios_especiais(Path(args.docx_municipios_especiais))
-    localidade = classificar_destino(args.municipio, bool(args.outro_estado), especiais)
-
-    inicio = parse_dt(args.inicio)
-    fim = parse_dt(args.fim)
-
-    di, pa = calcular_di_pa_planilha(inicio, fim)
-    L, M, N = distribuir_quantidades(di, pa, bool(args.pousada))
-
-    g = calc_g(args.quinquenios, args.ade)
-    h = calc_h(args.trintenario, g)
-
-    k = calcular_k(args.graduacao, localidade, h, VALOR_DIA_POR_GRADUACAO)
-    total = calcular_total(k, L, M, N, float(args.ajuda_custo))
-
-    res = Resultado(
-        localidade=localidade, di=di, pa=pa,
-        L_diarias=L, M_pas=M, N_pp=N,
-        g=g, h=h, k=k, total=total
+    res = calcular_diarias(
+        graduacao=args.graduacao,
+        municipio=args.municipio,
+        inicio=args.inicio,
+        fim=args.fim,
+        quinquenios=args.quinquenios,
+        ade=args.ade,
+        trintenario=args.trintenario,
+        outro_estado=bool(args.outro_estado),
+        pousada=bool(args.pousada),
+        ajuda_custo=float(args.ajuda_custo),
     )
 
     print("\n=== RESULTADO (réplica da planilha) ===")

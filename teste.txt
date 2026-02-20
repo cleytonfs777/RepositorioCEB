@@ -1,0 +1,70 @@
+no relatorio de viagem diligente na linha 517, o retorno do texto é:
+GOVERNO DO ESTADO DE MINAS GERAIS
+CORPO DE BOMBEIROS MILITAR DE MINAS GERAIS
+Subdiretoria de Tecnologia e Sistemas
+  Belo Horizonte, 09 de fevereiro de 2026.
+   RELATÓRIO DE VIAGEM CBMMG
+CBMMG-RELATÓRIO DE VIAGEM/DADOS DO LOCAL,DATAS E HORÁRIOS
+ORIGEM DA DSP (O.S/B.O):
+2025-058984040-001
+UNIDADE DO MILITAR:
+BOA
+N. MILITAR: :
+167.493-6
+NOME:
+João Paulo do Carmo Souza
+POSTO/GRAD:
+1° Tenente
+N° Seq. LOCAL DE PARTIDA DATA DE PARTIDA HORÁRIO DE PARTIDA LOCAL DE DESTINO DATA DE DESTINO HORÁRIO DE DESTINO
+01
+Belo horizonte
+23/12/2025
+10:01
+Teófilo Otoni
+23/12/2025
+11:24
+02
+Teófilo Otoni
+23/12/2025
+13:39
+Uberlândia
+23/12/2025
+16:00
+03
+Uberlândia
+23/12/2025
+16:54
+Belo horizonte
+23/12/2025
+18:34
+04
+05
+06
+07
+08
+09
+10
+OBSERVAÇÕES DA DSP:
+  DSP TRANSCORREU SEM ALTERAÇÕES.
+    Referência: Processo nº 1400.01.0008514/2026-81 SEI nº 132918758
+Criado por 08761724602, versão 1 por 08761724602 em 09/02/2026 13:30:28.
+
+Em cada texto preciso pegar esse numero que vem logo abaixo de N. MILITAR:
+N. MILITAR: :
+167.493-6
+
+a partir desse numero preciso recorrer ao meu dicionario militares_dict e buscar em cada chave: "01", "02", ... o parametro numero. quanto achar um numero igual a esse numero que vem logo abaixo de N. MILITAR: ele deve
+
+criar nesse objeto uma chave chamada details e dentro dessa chave estrair os valores desse texto apontado da seguinte forma:
+
+"details": {
+  "01": {
+    l_partida:"Belo horizonte",
+    d_partida:"23/12/2025",
+    h_partida:"10:01",
+    l_destino:"Teófilo Otoni",
+    d_destino:"23/12/2025",
+    h_destino:"11:24",
+  }
+}
+
