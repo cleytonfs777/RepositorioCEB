@@ -6,6 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
 from time import sleep
 import os
 import re
@@ -20,6 +21,123 @@ load_dotenv()
 os.environ['NO_PROXY'] = 'localhost,127.0.0.1'
 os.environ['no_proxy'] = 'localhost,127.0.0.1'
 
+def muda_frame(navegador, id_frame, wait):
+    """
+    Função para mudar o frame do navegador para um frame específico pelo ID.
+    """
+    try:
+        navegador.switch_to.default_content()
+        ifr_vis = wait.until(
+            EC.presence_of_element_located((By.ID, f"{id_frame}"))
+        )
+        navegador.switch_to.frame(ifr_vis)
+        
+        print(f"Mudou para {id_frame}")
+
+    except Exception as frame_err:
+        print(f"Falha ao acessar {id_frame}: {frame_err}")
+
+def gerador_documento(navegador, conteudo_html, tipo_documento="Ofício", wait=None):
+    """
+    Função para gerar um documento a partir de um conteúdo HTML.
+    """
+    print("Entrando no gerador de documentos...")
+     # mudar o frame
+    muda_frame(navegador, "ifrVisualizacao", wait)
+    print("Incluindo documento...")
+
+    # cliar em Incluir Documento
+    navegador.execute_script('document.querySelector("#divArvoreAcoes > a:nth-child(1) > img").click()')
+
+    print("Documento incluído!")
+    
+    # Clica na ferramenta expansão
+    navegador.find_element(By.CSS_SELECTOR, "#ancExibirSeries").click()
+    
+    # clicar em Ofício
+    sleep(1)  # Aumentado para headless
+    
+    # Escreve o conteudo de tipo_documento no console para debug
+    print(f"Selecionando tipo de documento: {tipo_documento}")
+    
+
+
+    ActionChains(navegador).send_keys(tipo_documento).perform()
+    
+    # Tecla tab
+    ActionChains(navegador).send_keys(Keys.TAB).perform()
+    sleep(0.5)  # Aumentado para headless
+    
+    # Tecla Enter
+    ActionChains(navegador).send_keys(Keys.ENTER).perform()
+    
+
+    print(f"Tipo {tipo_documento} selecionado!")
+
+    sleep(2)  # Aumentado para headless
+    # clicar em Público
+    navegador.execute_script('document.querySelector("#divOptPublico > div > label").click()')
+    sleep(1)  # Aumentado para headless
+
+    # clicar em Salvar
+    navegador.execute_script('document.querySelector("#btnSalvar").click()')
+    
+    print(f"{tipo_documento} salvo!")
+    
+    sleep(12)  # Aumentado para headless - aguardar nova janela abrir
+
+    # mudar a janela - esperar até ter 2 janelas
+    wait = WebDriverWait(navegador, 20)
+    wait.until(lambda d: len(d.window_handles) > 1)
+    
+    janela2 = navegador.window_handles[1]
+    navegador.switch_to.window(janela2)
+    
+    sleep(2)  # Aguardar janela carregar completamente
+
+    print("Inserindo conteúdo no editor...")
+
+    # mudar o iframe - aguardar estar presente
+    try:
+        iframe = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#cke_3_contents > iframe")))
+        navegador.switch_to.frame(iframe)
+        print("Mudou para iframe do editor")
+    except Exception as iframe_err:
+        print(f"Falha ao acessar iframe do editor: {iframe_err}")
+        return
+    
+    sleep(1)  # Aguardar iframe carregar
+    try:
+        # Aguarda o body estar presente
+        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "body")))
+        print("Editor pronto para receber conteúdo")
+        navegador.execute_script(f"document.body.innerHTML = `{conteudo_html}`")
+    except Exception as body_err:
+        print(f"Falha ao acessar body do editor: {body_err}")
+        return
+    #cke_3_contents > iframe
+    
+    return
+    
+    sleep(1)  # Aguardar conteúdo ser inserido
+    
+    print("Conteúdo inserido no ofício!")
+
+    # salvar o documento
+    navegador.switch_to.default_content()
+    sleep(2)
+    
+    # Clicar no botão salvar com wait
+    btn_salvar = wait.until(EC.element_to_be_clickable((By.XPATH, "/html/body/form/div[1]/div[1]/div/div/span[2]/span[1]/span[3]/a")))
+    navegador.execute_script("arguments[0].click();", btn_salvar)
+    
+    print("Salvando documento...")
+    
+    sleep(3)  # Aumentado para headless
+    navegador.close()
+    
+    print("Documento salvo!")
+    
 
 def extrair_militares_relatorio(texto):
     """
@@ -621,8 +739,9 @@ def gerar_resposta(doc_sei):
             print(json.dumps(militares_dict, indent=2, ensure_ascii=False))
             print("="*70)
             
-            
             # Criando os documentos para compor a arvore do processo
+            conteudo_doc = "<h1>Teste para conteudo de documento</h1><p>Gerado automaticamente pelo script de automação.</p>"
+            gerador_documento(navegador,conteudo_doc, "Viagem/Agente de Ação", wait)
             
             try:
                 print("Criando documentos para compor a árvore do processo...")
