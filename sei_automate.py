@@ -61,7 +61,6 @@ def gerador_documento(navegador, conteudo_html, tipo_documento="Ofício", wait=N
     print(f"Selecionando tipo de documento: {tipo_documento}")
     
 
-
     ActionChains(navegador).send_keys(tipo_documento).perform()
     
     # Tecla tab
@@ -117,12 +116,7 @@ def gerador_documento(navegador, conteudo_html, tipo_documento="Ofício", wait=N
         return
     #cke_3_contents > iframe
     
-    return
     
-    sleep(1)  # Aguardar conteúdo ser inserido
-    
-    print("Conteúdo inserido no ofício!")
-
     # salvar o documento
     navegador.switch_to.default_content()
     sleep(2)
@@ -137,7 +131,11 @@ def gerador_documento(navegador, conteudo_html, tipo_documento="Ofício", wait=N
     navegador.close()
     
     print("Documento salvo!")
-    
+    return
+
+def atualiza_info_documento():
+    print("Atualizando informações do documento com dados dos militares...")
+
 
 def extrair_militares_relatorio(texto):
     """
@@ -741,7 +739,14 @@ def gerar_resposta(doc_sei):
             
             # Criando os documentos para compor a arvore do processo
             conteudo_doc = "<h1>Teste para conteudo de documento</h1><p>Gerado automaticamente pelo script de automação.</p>"
+            
+            # Pegar o conteudo de modelos
+            
+            
             gerador_documento(navegador,conteudo_doc, "Viagem/Agente de Ação", wait)
+            
+            # Atualizando dados dos militares no primeiro documento criado
+            atualiza_info_documento()
             
             try:
                 print("Criando documentos para compor a árvore do processo...")
